@@ -1,0 +1,598 @@
+{
+  "name": "Bot Restaurante PRO v2",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "Bot-restaurante",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-896, 256],
+      "id": "2e2a0648-2ebd-4393-8c77-85d412805c21",
+      "name": "Webhook",
+      "webhookId": "bot-restaurante-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.item.json.body || $input.item.json;\n\nconst eventType = body.event?.type || \"\";\nif (eventType && eventType !== \"messages\") {\n  return { json: { normalized: { is_valid: false, event: eventType } } };\n}\n\nconst messages = body.messages || [];\nconst msg = messages[0] || {};\nconst messageType = msg.type || \"text\";\nconst isAudio = messageType === \"audio\" || messageType === \"voice\" || messageType === \"ptt\";\nlet messageText = \"\";\nif (messageType === \"text\") {\n  messageText = msg.text?.body || \"\";\n}\nconst fromMe = msg.from_me || false;\n\nif (fromMe) {\n  return { json: { normalized: { is_valid: false, from_me: true, event: eventType } } };\n}\n\nlet chatId = msg.chat_id || msg.from || \"\";\nchatId = chatId.split(\"@\")[0];\n\nlet phoneDisplay = chatId;\nif (chatId.length >= 8) {\n  phoneDisplay = \"+\" + chatId;\n}\n\nlet audioId = \"\";\nlet audioUrl = \"\";\nif (isAudio) {\n  const mediaObj = msg.voice || msg.audio || msg.media || {};\n  audioId = mediaObj.id || \"\";\n  if (audioId) {\n    audioUrl = `https://gate.whapi.cloud/media/${audioId}`;\n  }\n}\n\nconst isImage = messageType === \"image\" || messageType === \"sticker\" || messageType === \"document\";\nconst isValid = !fromMe && (messageText.length > 0 || isAudio);\n\nreturn {\n  json: {\n    normalized: {\n      message_id: msg.id || \"\",\n      chat_id: chatId,\n      phone_display: phoneDisplay,\n      from: msg.from || \"\",\n      from_name: msg.from_name || \"Cliente\",\n      device: body.channel_id || \"\",\n      message_type: messageType,\n      is_audio: isAudio,\n      is_image: isImage,\n      has_text: messageText.length > 0,\n      text: messageText,\n      audio_id: audioId,\n      audio_url: audioUrl,\n      from_me: fromMe,\n      is_valid: isValid,\n      event: eventType,\n      timestamp: new Date().toISOString()\n    },\n    raw: body\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-672, 256],
+      "id": "1413ff05-460f-4c63-a0ca-641f3976f383",
+      "name": "Normalizar"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid",
+              "leftValue": "={{ $json.normalized.is_valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-496, 256],
+      "id": "8d4f6403-504e-4761-aad3-d732517a7e70",
+      "name": "Validar Mensaje"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1LPYuvmpr8AfJgZzwurBaTSsHANz87VNyAm1VmV71_E0",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Config",
+          "mode": "name"
+        },
+        "options": {
+          "range": "A1:J2"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [-288, 256],
+      "id": "b5e6f7a8-9012-3456-b5e6-f7a890123456",
+      "name": "Leer Config",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "34UIt4KVxlKSFhXx",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0c256473-ecd7-481c-99c9-113dd30cb41d",
+              "leftValue": "={{ $('Normalizar').item.json.normalized.is_audio }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-64, 240],
+      "id": "7ffe08f4-ae92-4761-a7eb-011bac5fec0d",
+      "name": "¿Es Audio?"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Normalizar').item.json.normalized.audio_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [160, 0],
+      "id": "930a75a0-8901-45c1-a3ba-d738e533313f",
+      "name": "Descargar Audio",
+      "retryOnFail": true,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "vDMyQRDUlX2Ytpke",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/audio/transcriptions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{}]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "model",
+              "value": "whisper-1"
+            },
+            {
+              "name": "language",
+              "value": "es"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [336, 0],
+      "id": "88e97446-18dc-4e43-86ec-bc8a4fc9a27f",
+      "name": "Transcribir Audio",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "vDMyQRDUlX2Ytpke",
+          "name": "Header Auth account"
+        },
+        "httpBearerAuth": {
+          "id": "rDCLVa4c06mmghb0",
+          "name": "Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const transcription = $input.item.json.text || \"\";\nconst original = $('Normalizar').item.json.normalized;\n\nconsole.log('🎤 Audio transcrito:', transcription);\n\nconst updated = {\n  ...original,\n  text: transcription,\n  has_text: Boolean(transcription.length > 0),\n  is_valid: Boolean(transcription.length > 0 && !original.from_me),\n  is_audio: false,\n  audio_transcribed: true\n};\n\nreturn {\n  json: {\n    normalized: updated\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [512, 0],
+      "id": "290f6145-d84e-43bd-b126-ed83da1d42dd",
+      "name": "Actualizar con Transcripción"
+    },
+    {
+      "parameters": {
+        "jsCode": "const chatId = $input.item.json.normalized.chat_id;\nconst texto  = $input.item.json.normalized.text || \"\";\nconst ts     = Date.now();\n\nif (!global.msgQueue) global.msgQueue = {};\n\nif (!global.msgQueue[chatId]) {\n  global.msgQueue[chatId] = { messages: [], lastTs: 0 };\n}\n\nglobal.msgQueue[chatId].messages.push(texto);\nglobal.msgQueue[chatId].lastTs = ts;\n\nconsole.log(`📥 Cola [${chatId}]: ${global.msgQueue[chatId].messages.length} mensaje(s)`);\n\nreturn { json: $input.item.json };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [160, 256],
+      "id": "e051b60f-5c76-45da-88da-74445aa49c79",
+      "name": "Guardar en Cola"
+    },
+    {
+      "parameters": {
+        "amount": 6
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [368, 256],
+      "id": "a07b6099-e2ea-4ebe-b605-89c5a1438efc",
+      "name": "Esperar 6s",
+      "webhookId": "debounce-wait-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const chatId = $input.item.json.normalized.chat_id;\nconst ts     = Date.now();\n\nif (!global.msgQueue) global.msgQueue = {};\n\nconst cola = global.msgQueue[chatId];\n\nif (!cola || cola.messages.length === 0) {\n  return { json: $input.item.json };\n}\n\nconst tiempoDesdeUltimo = ts - cola.lastTs;\n\nif (tiempoDesdeUltimo < 6000) {\n  console.log(`⏸️ Ejecución abortada para [${chatId}] — hay mensajes más recientes`);\n  global.msgQueue[chatId].messages = [];\n  return [];\n}\n\nconst textoCombinado = cola.messages\n  .filter(m => m && m.trim().length > 0)\n  .join(\" \");\n\nconsole.log(`✅ Procesando [${chatId}]: \"${textoCombinado}\"`);\n\nglobal.msgQueue[chatId] = { messages: [], lastTs: 0 };\n\nconst normalizedActualizado = {\n  ...$input.item.json.normalized,\n  text: textoCombinado,\n  has_text: textoCombinado.length > 0\n};\n\nreturn { json: { normalized: normalizedActualizado } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [592, 256],
+      "id": "bb8469a5-df47-479b-8cc0-0a01feab3272",
+      "name": "Agrupar Mensajes"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "maxTokens": 900,
+          "temperature": 0.5
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [720, 512],
+      "id": "c4c14a16-3cac-4cfc-a376-33afc4cbf04b",
+      "name": "OpenAI",
+      "credentials": {
+        "openAiApi": {
+          "id": "V5XZP73sHGLBhTqr",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Normalizar').item.json.normalized.chat_id }}",
+        "contextWindowLength": 20
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [896, 512],
+      "id": "d58c830c-3a05-41a1-a95a-d7fe643e5a68",
+      "name": "Memoria por Usuario"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Normalizar').item.json.normalized.text }}",
+        "options": {
+          "systemMessage": "=Eres \"{{ $('Leer Config').item.json.nombre_bot }}\" 🤖, el asistente virtual de pedidos de \"{{ $('Leer Config').item.json.nombre_restaurante }}\" — con delivery {{ $('Leer Config').item.json.delivery_precio }} en {{ $('Leer Config').item.json.ciudad }}.\n\n━━━━━━━━━━━━━━━━━━━━━━\n🎯 TU MISIÓN\n━━━━━━━━━━━━━━━━━━━━━━\nTomar pedidos de forma CONVERSACIONAL, cálida y eficiente. Nunca parecer un robot ni un formulario. Eres como el mesero más simpático del restaurante, pero por WhatsApp.\n\n━━━━━━━━━━━━━━━━━━━━━━\n📋 FLUJO DEL PEDIDO (en este orden)\n━━━━━━━━━━━━━━━━━━━━━━\n1. 👋 SALUDO — Si es el primer mensaje, saluda con energía y pregunta qué se les antoja\n2. 🍽️ PEDIDO — Confirma los items y cantidades\n3. 👤 NOMBRE — Pide el nombre amablemente\n4. 📍 DIRECCIÓN — Pide dirección con referencia (colonia, punto de referencia)\n5. ✅ CONFIRMACIÓN — Resume el pedido completo con total y tiempo estimado\n\n⚠️ NUNCA pidas el número de teléfono — ya lo tienes por WhatsApp.\n\n━━━━━━━━━━━━━━━━━━━━━━\n🍽️ MENÚ COMPLETO — {{ $('Leer Config').item.json.nombre_restaurante }}\n━━━━━━━━━━━━━━━━━━━━━━\n\n{{ $('Leer Config').item.json.menu_texto }}\n\n💰 Delivery: {{ $('Leer Config').item.json.delivery_precio }} en {{ $('Leer Config').item.json.ciudad }}\n⏰ Entrega: {{ $('Leer Config').item.json.tiempo_entrega }}\n🕐 Horario: {{ $('Leer Config').item.json.horario }}\n\n━━━━━━━━━━━━━━━━━━━━━━\n📸 CUANDO PIDAN EL MENÚ\n━━━━━━━━━━━━━━━━━━━━━━\nSi el cliente pide ver el menú, la carta, qué tienen, qué venden, o qué hay para comer, responde con send_menu: true en el JSON. El sistema enviará la imagen automáticamente.\n\n━━━━━━━━━━━━━━━━━━━━━━\n✨ PERSONALIDAD Y TONO\n━━━━━━━━━━━━━━━━━━━━━━\n- Cálido, cercano, como si hablaras con un amigo que trabaja en el restaurante\n- Mensajes CORTOS: máximo 2-3 líneas por respuesta\n- Usa emojis con moderación (1-2 por mensaje, no en cada frase)\n- Si el cliente manda audio, respóndele normalmente sin mencionar el audio\n- Si preguntan algo que no está en el menú, díselo con amabilidad y ofrece alternativas\n- Si el restaurante está cerrado (fuera del horario {{ $('Leer Config').item.json.horario }}), díselo con cordialidad e invítales a volver\n\n⚠️ MANEJO DE QUEJAS Y CLIENTES MOLESTOS\n- Nunca te pongas a la defensiva ni uses frases genéricas como \"lamentamos el inconveniente\"\n- Reconoce el malestar del cliente con empatía real: \"Entiendo que eso es frustrante, tienes razón\"\n- Ofrece una solución concreta o diles que el equipo del restaurante les contactará\n- Si el lenguaje es muy agresivo o inapropiado, mantén la calma y díselo con respeto: \"Te entiendo, pero podemos resolver esto juntos si hablamos con calma 🙏\"\n- Jamás respondas con sarcasmo, nunca ignores una queja\n\n━━━━━━━━━━━━━━━━━━━━━━\n🔢 CÁLCULO DEL TOTAL\n━━━━━━━━━━━━━━━━━━━━━━\nSiempre suma todos los items con sus cantidades. Ejemplo:\n- 2x Pizza Pepperoni = $20.00\n- 3x Pupusas = $3.00\n- 1x Horchata = $2.00\n→ TOTAL = $25.00\n\n━━━━━━━━━━━━━━━━━━━━━━\n📊 FORMATO DE RESPUESTA — MUY IMPORTANTE\n━━━━━━━━━━━━━━━━━━━━━━\nResponde SIEMPRE con un objeto JSON válido. Sin texto antes ni después. Sin bloques de código.\n\nCampos disponibles:\n- text_response: tu mensaje al cliente\n- order_complete: true solo cuando tienes items + nombre + dirección\n- send_menu: true solo si el cliente pide ver el menú\n- order_details: objeto con los detalles del pedido (solo cuando order_complete es true)\n\nEjemplo pedido INCOMPLETO:\n{\"text_response\":\"¡Hola! 👋 Bienvenido a {{ $('Leer Config').item.json.nombre_restaurante }}. ¿Qué se te antoja hoy?\",\"order_complete\":false,\"send_menu\":false,\"order_details\":null}\n\nEjemplo cuando piden el menú:\n{\"text_response\":\"¡Claro! Aquí te mando nuestra carta 😊 Dime qué se te antoja.\",\"order_complete\":false,\"send_menu\":true,\"order_details\":null}\n\nEjemplo pedido COMPLETO:\n{\"text_response\":\"¡Perfecto, Carlos! ✅ Tu pedido está confirmado:\\n\\n🍕 1x Pizza Pepperoni — $10.00\\n🥤 1x Horchata Fresca — $2.00\\n━━━━━━━━━━━━━\\n💰 Total: $12.00\\n📍 Col. Escalón, frente al parque\\n⏰ Llegará en aprox. {{ $('Leer Config').item.json.tiempo_entrega }}\\n\\n¡Gracias por tu preferencia! Te avisamos cuando esté en camino 🛵\",\"order_complete\":true,\"send_menu\":false,\"order_details\":{\"cliente\":\"Carlos\",\"pedido\":\"1x Pizza Pepperoni, 1x Horchata Fresca\",\"direccion\":\"Col. Escalón, frente al parque\",\"total\":\"12.00\",\"items_detalle\":[{\"item\":\"Pizza Pepperoni x1\",\"subtotal\":\"10.00\"},{\"item\":\"Horchata Fresca x1\",\"subtotal\":\"2.00\"}]}}\n\nIMPORTANTE: El campo total debe ser SOLO el número, sin símbolo $. Responde SOLO el JSON."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [800, 256],
+      "id": "301ceebf-990a-4f1d-b983-e723d5af580b",
+      "name": "Agente AI"
+    },
+    {
+      "parameters": {
+        "jsCode": "const textoIA = $input.item.json.output || \"\";\n\nconsole.log('📥 Respuesta cruda de IA:', textoIA);\n\nlet datos = {\n  text_response: \"\",\n  order_complete: false,\n  send_menu: false,\n  order_details: null\n};\n\nconst inicioJSON = textoIA.indexOf('{');\nconst finJSON = textoIA.lastIndexOf('}') + 1;\n\nif (inicioJSON !== -1 && finJSON > inicioJSON) {\n  try {\n    let jsonLimpio = textoIA.substring(inicioJSON, finJSON);\n    jsonLimpio = jsonLimpio\n      .replace(/[\\u0000-\\u001F\\u007F-\\u009F]/g, '')\n      .replace(/\\n/g, '\\\\n');\n    datos = JSON.parse(jsonLimpio);\n    console.log('✅ JSON parseado correctamente');\n  } catch (error) {\n    console.error('❌ Error al parsear JSON:', error.message);\n    const match = textoIA.match(/\\\"text_response\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"/);\n    if (match) {\n      datos.text_response = match[1].replace(/\\\\n/g, '\\n');\n    } else {\n      datos.text_response = textoIA.replace(/```json|```/g, '').trim();\n    }\n  }\n} else {\n  datos.text_response = textoIA.trim();\n}\n\nif (!datos.text_response || datos.text_response.length === 0) {\n  datos.text_response = \"Disculpa, tuve un problema procesando tu mensaje. ¿Podrías repetirlo? 🙏\";\n}\n\nif (typeof datos.order_complete !== 'boolean') datos.order_complete = false;\nif (typeof datos.send_menu !== 'boolean') datos.send_menu = false;\n\ndatos.text_response = datos.text_response\n  .replace(/\\\\n/g, '\\n')\n  .replace(/\\\\\"/g, '\"')\n  .replace(/\\\\\\\\/g, '\\\\')\n  .trim();\n\nif (datos.order_details && datos.order_details.total) {\n  datos.order_details.total = datos.order_details.total.toString().replace('$', '').trim();\n}\n\nlet chat_id = \"\", from = \"\", phone_display = \"\", from_name = \"\";\n\ntry {\n  const normalizerData = $('Normalizar').item.json.normalized;\n  if (normalizerData) {\n    chat_id = normalizerData.chat_id || \"\";\n    from = normalizerData.from || \"\";\n    phone_display = normalizerData.phone_display || chat_id;\n    from_name = normalizerData.from_name || \"Cliente\";\n  }\n} catch (error) {\n  console.error('⚠️ Error al obtener datos del nodo Normalizar:', error.message);\n}\n\nreturn {\n  json: {\n    text_response: datos.text_response,\n    pedido_completo: datos.order_complete,\n    enviar_menu: datos.send_menu,\n    detalles_pedido: datos.order_details,\n    chat_id: chat_id,\n    from: from,\n    phone_display: phone_display,\n    from_name: from_name\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1024, 256],
+      "id": "6790e53c-fe69-4b76-a39a-e1eff0e14498",
+      "name": "Parser JSON"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "complete",
+              "leftValue": "={{ $json.pedido_completo }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1280, 256],
+      "id": "26fd5077-1139-4850-b525-3547ccd3094c",
+      "name": "¿Pedido Completo?"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1LPYuvmpr8AfJgZzwurBaTSsHANz87VNyAm1VmV71_E0",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1LPYuvmpr8AfJgZzwurBaTSsHANz87VNyAm1VmV71_E0/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Fecha": "={{ $now.format('yyyy-MM-dd HH:mm:ss') }}",
+            "Cliente": "={{ $('Parser JSON').item.json.detalles_pedido.cliente }}",
+            "Telefono": "={{ $('Parser JSON').item.json.phone_display }}",
+            "Pedido": "={{ $('Parser JSON').item.json.detalles_pedido.pedido }}",
+            "Direccion": "={{ $('Parser JSON').item.json.detalles_pedido.direccion }}",
+            "Total": "={{ $('Parser JSON').item.json.detalles_pedido.total }}",
+            "Estado": "Pendiente",
+            "Canal": "WhatsApp",
+            "Restaurante": "={{ $('Leer Config').item.json.nombre_restaurante }}"
+          },
+          "matchingColumns": ["Fecha"],
+          "schema": [
+            { "id": "Fecha", "displayName": "Fecha", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Cliente", "displayName": "Cliente", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Telefono", "displayName": "Telefono", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Pedido", "displayName": "Pedido", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Direccion", "displayName": "Direccion", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Total", "displayName": "Total", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Estado", "displayName": "Estado", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Canal", "displayName": "Canal", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Restaurante", "displayName": "Restaurante", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [1568, 80],
+      "id": "3a6f584d-c3d8-4331-9a9d-2e26c021ff19",
+      "name": "Guardar en Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "34UIt4KVxlKSFhXx",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "send_menu",
+              "leftValue": "={{ $json.enviar_menu }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1568, 416],
+      "id": "40508e72-123d-43c3-8336-9f2a86f30a50",
+      "name": "¿Enviar Menú?"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Leer Config').item.json.email_notificacion }}",
+        "subject": "=🍽️ Nuevo Pedido #{{ $now.format('HHmmss') }} — {{ $('Parser JSON').item.json.detalles_pedido.cliente }} | {{ $('Leer Config').item.json.nombre_restaurante }}",
+        "message": "=<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"UTF-8\">\n  <style>\n    body { font-family: Arial, sans-serif; background: #f0f2f5; padding: 0; margin: 0; }\n    .wrapper { padding: 30px 20px; }\n    .container { background: white; border-radius: 12px; max-width: 580px; margin: 0 auto; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }\n    .header { background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%); color: white; padding: 30px; text-align: center; }\n    .header h1 { margin: 0 0 6px 0; font-size: 24px; letter-spacing: -0.5px; }\n    .header .badge { display: inline-block; background: rgba(255,255,255,0.25); border-radius: 20px; padding: 4px 14px; font-size: 13px; margin-top: 8px; }\n    .body { padding: 28px; }\n    .section { margin-bottom: 20px; background: #f8f9fa; border-radius: 10px; padding: 18px; border-left: 4px solid #ff6b35; }\n    .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: #ff6b35; margin-bottom: 10px; }\n    .info-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px; }\n    .info-row:last-child { border-bottom: none; }\n    .info-label { color: #6b7280; font-weight: 500; }\n    .info-value { color: #1f2937; font-weight: 600; text-align: right; max-width: 60%; }\n    .pedido-text { color: #1f2937; font-size: 15px; line-height: 1.6; }\n    .total-box { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border-radius: 10px; padding: 22px; text-align: center; margin-top: 24px; }\n    .total-label { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.85; margin-bottom: 6px; }\n    .total-amount { font-size: 36px; font-weight: 800; letter-spacing: -1px; }\n    .alert-box { background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 14px 18px; margin-top: 20px; font-size: 13px; color: #856404; }\n    .footer { text-align: center; padding: 20px; color: #9ca3af; font-size: 12px; border-top: 1px solid #f3f4f6; }\n  </style>\n</head>\n<body>\n<div class=\"wrapper\">\n  <div class=\"container\">\n    <div class=\"header\">\n      <h1>🍽️ Nuevo Pedido Recibido</h1>\n      <div class=\"badge\">{{ $('Leer Config').item.json.nombre_restaurante }} · Pedido #{{ $now.format('HHmmss') }} · {{ $now.format('dd/MM/yyyy HH:mm') }}</div>\n    </div>\n    <div class=\"body\">\n      <div class=\"section\">\n        <div class=\"section-title\">👤 Datos del Cliente</div>\n        <div class=\"info-row\"><span class=\"info-label\">Nombre</span><span class=\"info-value\">{{ $('Parser JSON').item.json.detalles_pedido.cliente }}</span></div>\n        <div class=\"info-row\"><span class=\"info-label\">Teléfono</span><span class=\"info-value\">{{ $('Parser JSON').item.json.phone_display }}</span></div>\n      </div>\n      <div class=\"section\">\n        <div class=\"section-title\">🛒 Detalle del Pedido</div>\n        <div class=\"pedido-text\">{{ $('Parser JSON').item.json.detalles_pedido.pedido }}</div>\n      </div>\n      <div class=\"section\">\n        <div class=\"section-title\">📍 Dirección de Entrega</div>\n        <div class=\"pedido-text\">{{ $('Parser JSON').item.json.detalles_pedido.direccion }}</div>\n      </div>\n      <div class=\"section\">\n        <div class=\"section-title\">ℹ️ Info del Pedido</div>\n        <div class=\"info-row\"><span class=\"info-label\">Canal</span><span class=\"info-value\">WhatsApp</span></div>\n        <div class=\"info-row\"><span class=\"info-label\">Tiempo estimado</span><span class=\"info-value\">{{ $('Leer Config').item.json.tiempo_entrega }}</span></div>\n        <div class=\"info-row\"><span class=\"info-label\">Delivery</span><span class=\"info-value\">✅ {{ $('Leer Config').item.json.delivery_precio }}</span></div>\n      </div>\n      <div class=\"total-box\">\n        <div class=\"total-label\">💰 Total a Cobrar</div>\n        <div class=\"total-amount\">${{ $('Parser JSON').item.json.detalles_pedido.total }}</div>\n      </div>\n      <div class=\"alert-box\">⏰ El cliente ya fue notificado. Tiempo estimado de entrega: <strong>{{ $('Leer Config').item.json.tiempo_entrega }}</strong>. Confirma disponibilidad antes de salir.</div>\n    </div>\n    <div class=\"footer\">Este correo fue generado automáticamente · Bot Restaurante PRO · {{ $('Leer Config').item.json.nombre_restaurante }}</div>\n  </div>\n</div>\n</body>\n</html>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1872, 80],
+      "id": "33ebffa4-8585-43c8-b0b8-6309d45f7771",
+      "name": "Enviar Email Pedido",
+      "webhookId": "943dc00b-1c1f-4a9f-9f50-814cfde8f0d3",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "fEys13Sy5q8LBmNO",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://gate.whapi.cloud/messages/image?force_lid=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Leer Config').item.json.token_whapi }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "to",
+              "value": "={{ $('Parser JSON').item.json.chat_id }}"
+            },
+            {
+              "name": "media",
+              "value": "={{ $('Leer Config').item.json.url_menu_imagen }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1824, 288],
+      "id": "a6b4a7f3-800e-4acd-9cdf-fb6105906ede",
+      "name": "Enviar Imagen Menú",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "maxTries": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://gate.whapi.cloud/messages/text?force_lid=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Leer Config').item.json.token_whapi }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "to",
+              "value": "={{ $('Parser JSON').item.json.chat_id }}"
+            },
+            {
+              "name": "body",
+              "value": "={{ $('Parser JSON').item.json.text_response }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2096, 432],
+      "id": "ccbdaf66-e3a4-40ff-9fe7-0a3222210697",
+      "name": "Enviar WhatsApp",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "maxTries": 2
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Normalizar", "type": "main", "index": 0 }]]
+    },
+    "Normalizar": {
+      "main": [[{ "node": "Validar Mensaje", "type": "main", "index": 0 }]]
+    },
+    "Validar Mensaje": {
+      "main": [[{ "node": "Leer Config", "type": "main", "index": 0 }]]
+    },
+    "Leer Config": {
+      "main": [[{ "node": "¿Es Audio?", "type": "main", "index": 0 }]]
+    },
+    "¿Es Audio?": {
+      "main": [
+        [{ "node": "Descargar Audio", "type": "main", "index": 0 }],
+        [{ "node": "Guardar en Cola", "type": "main", "index": 0 }]
+      ]
+    },
+    "Descargar Audio": {
+      "main": [[{ "node": "Transcribir Audio", "type": "main", "index": 0 }]]
+    },
+    "Transcribir Audio": {
+      "main": [[{ "node": "Actualizar con Transcripción", "type": "main", "index": 0 }]]
+    },
+    "Actualizar con Transcripción": {
+      "main": [[{ "node": "Agente AI", "type": "main", "index": 0 }]]
+    },
+    "Guardar en Cola": {
+      "main": [[{ "node": "Esperar 6s", "type": "main", "index": 0 }]]
+    },
+    "Esperar 6s": {
+      "main": [[{ "node": "Agrupar Mensajes", "type": "main", "index": 0 }]]
+    },
+    "Agrupar Mensajes": {
+      "main": [[{ "node": "Agente AI", "type": "main", "index": 0 }]]
+    },
+    "OpenAI": {
+      "ai_languageModel": [[{ "node": "Agente AI", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Memoria por Usuario": {
+      "ai_memory": [[{ "node": "Agente AI", "type": "ai_memory", "index": 0 }]]
+    },
+    "Agente AI": {
+      "main": [[{ "node": "Parser JSON", "type": "main", "index": 0 }]]
+    },
+    "Parser JSON": {
+      "main": [[{ "node": "¿Pedido Completo?", "type": "main", "index": 0 }]]
+    },
+    "¿Pedido Completo?": {
+      "main": [
+        [{ "node": "Guardar en Google Sheets", "type": "main", "index": 0 }],
+        [{ "node": "¿Enviar Menú?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Guardar en Google Sheets": {
+      "main": [[{ "node": "Enviar Email Pedido", "type": "main", "index": 0 }]]
+    },
+    "Enviar Email Pedido": {
+      "main": [[{ "node": "Enviar WhatsApp", "type": "main", "index": 0 }]]
+    },
+    "¿Enviar Menú?": {
+      "main": [
+        [{ "node": "Enviar Imagen Menú", "type": "main", "index": 0 }],
+        [{ "node": "Enviar WhatsApp", "type": "main", "index": 0 }]
+      ]
+    },
+    "Enviar Imagen Menú": {
+      "main": [[{ "node": "Enviar WhatsApp", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "3a779fb3-d82c-5def-9d18-c0a7b5e89c91",
+  "meta": {
+    "instanceId": "33792ea70a21703b8118ca372c2a0dfff95ef53ac797579bf64e3a3be01627a4"
+  },
+  "id": "oH2pkKtiEB8OI76F",
+  "tags": []
+}
